@@ -1,0 +1,148 @@
+name: A [Tubi] Sync & Build iOS Framework
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        type: choice
+        default: 'sync-and-build'
+        options:
+          - 'sync-only'
+          - 'sync-and-build'
+          - 'build-only'
+
+permissions:
+  contents: write
+
+jobs:
+  sync-and-build:
+    name: ${{ inputs.action }}
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        if: ${{ inputs.action == 'sync-only' || inputs.action == 'sync-and-build' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Sync with Upstream
+        if: ${{ inputs.action == 'sync-only' || inputs.action == 'sync-and-build' }}
+        run: |
+          git remote add upstream https://github.com/project-chip/connectedhomeip.git || true
+          git fetch upstream master
+
+          echo "Syncing main with upstream/master (excluding .github/workflows/)..."
+
+          # Do the merge without committing
+          git merge --no-commit --no-ff upstream/master || true
+
+          # Reset .github/workflows/ to keep only our version
+          git reset HEAD .github/workflows/ || true
+          git checkout -- .github/workflows/ || true
+
+          # Now commit the merge (everything except workflows)
+          git commit -m "Merge upstream/master (excluding workflow changes)"
+
+          git push origin main
+
+          echo "✅ Successfully synced with upstream (kept our workflows)"
+
+      - name: Sync Complete
+        if: ${{ inputs.action == 'sync-only' }}
+        run: |
+          echo "✅ Sync complete - skipping build"
+          echo "### ✅ Sync Complete" >> $GITHUB_STEP_SUMMARY
+          echo "Successfully synced main with upstream/master" >> $GITHUB_STEP_SUMMARY
+
+      - name: Cache Submodules
+        if: ${{ inputs.action == 'sync-and-build' || inputs.action == 'build-only' }}
+        uses: actions/cache@v4
+        with:
+          path: |
+            .git/modules
+            third_party
+          key: chip-submodules-${{ runner.os }}-${{ hashFiles('.gitmodules') }}
+          restore-keys: chip-submodules-${{ runner.os }}-
+
+      - name: Cache Bootstrap
+        if: ${{ inputs.action == 'sync-and-build' || inputs.action == 'build-only' }}
+        uses: actions/cache@v4
+        with:
+          path: |
+            .environment
+            build_overrides
+          key: chip-bootstrap-${{ runner.os }}-${{ hashFiles('scripts/setup/**') }}
+          restore-keys: chip-bootstrap-${{ runner.os }}-
+
+      - name: Bootstrap Build Environment
+        if: ${{ inputs.action == 'sync-and-build' || inputs.action == 'build-only' }}
+        uses: ./.github/actions/checkout-submodules-and-bootstrap
+        with:
+          platform: darwin
+
+      - name: Build XCFramework
+        if: ${{ inputs.action == 'sync-and-build' || inputs.action == 'build-only' }}
+        working-directory: examples/tv-casting-app/darwin/MatterTvCastingBridge
+        run: ./build_xcframework.sh
+
+      - name: Extract and Package dSYMs
+        if: ${{ inputs.action == 'sync-and-build' || inputs.action == 'build-only' }}
+        working-directory: examples/tv-casting-app/darwin/MatterTvCastingBridge
+        run: |
+          # Create dSYMs directory
+          mkdir -p dsyms
+
+          # Copy dSYMs from XCFramework
+          find xcframeworks/MatterTvCastingBridge.xcframework -name "*.dSYM" -type d -exec cp -R {} dsyms/ \;
+
+          # Package dSYMs separately
+          cd dsyms
+          zip -r ../MatterTvCastingBridge-${{ github.sha }}-dSYMs.zip .
+          cd ..
+
+          # Remove dSYMs from XCFramework to reduce size
+          find xcframeworks/MatterTvCastingBridge.xcframework -name "*.dSYM" -type d -exec rm -rf {} + 2>/dev/null || true
+
+      - name: Package Framework
+        if: ${{ inputs.action == 'sync-and-build' || inputs.action == 'build-only' }}
+        working-directory: examples/tv-casting-app/darwin/MatterTvCastingBridge
+        run: |
+          cd xcframeworks
+          zip -r ../MatterTvCastingBridge-${{ github.sha }}.xcframework.zip \
+            MatterTvCastingBridge.xcframework
+
+      - name: Upload Framework Artifact
+        if: ${{ inputs.action == 'sync-and-build' || inputs.action == 'build-only' }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: MatterTvCastingBridge-${{ github.sha }}
+          path: examples/tv-casting-app/darwin/MatterTvCastingBridge/MatterTvCastingBridge-${{ github.sha }}.xcframework.zip
+          retention-days: 90
+
+      - name: Upload dSYMs Artifact
+        if: ${{ inputs.action == 'sync-and-build' || inputs.action == 'build-only' }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: MatterTvCastingBridge-${{ github.sha }}-dSYMs
+          path: examples/tv-casting-app/darwin/MatterTvCastingBridge/MatterTvCastingBridge-${{ github.sha }}-dSYMs.zip
+          retention-days: 90
+
+      - name: Build Summary
+        if: ${{ inputs.action == 'sync-and-build' || inputs.action == 'build-only' }}
+        run: |
+          echo "### ✅ Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Action**: ${{ inputs.action }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download the artifact from the Actions summary above." >> $GITHUB_STEP_SUMMARY
