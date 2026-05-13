@@ -51,6 +51,13 @@ jobs:
                 net.ipv4.conf.all.forwarding=1 net.ipv6.conf.all.forwarding=1"
 
         steps:
+            - name: Harden the runner
+              uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.19.1
+              with:
+                use-policy-store: true
+                egress-policy: audit
+                api-key: ${{ secrets.STEP_SECURITY_API_KEY }}
+
             - name: Dump GitHub context
               env:
                   GITHUB_CONTEXT: ${{ toJSON(github) }}
@@ -165,6 +172,13 @@ jobs:
                 net.ipv4.conf.all.forwarding=1 net.ipv6.conf.all.forwarding=1"
 
         steps:
+            - name: Harden the runner
+              uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.19.1
+              with:
+                use-policy-store: true
+                egress-policy: audit
+                api-key: ${{ secrets.STEP_SECURITY_API_KEY }}
+
             - name: Dump GitHub context
               env:
                   GITHUB_CONTEXT: ${{ toJSON(github) }}
@@ -348,6 +362,13 @@ jobs:
                 net.ipv4.conf.all.forwarding=1 net.ipv6.conf.all.forwarding=1"
 
         steps:
+            - name: Harden the runner
+              uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.19.1
+              with:
+                use-policy-store: true
+                egress-policy: audit
+                api-key: ${{ secrets.STEP_SECURITY_API_KEY }}
+
             - name: Dump GitHub context
               env:
                   GITHUB_CONTEXT: ${{ toJSON(github) }}
@@ -411,6 +432,13 @@ jobs:
                 net.ipv4.conf.all.forwarding=1 net.ipv6.conf.all.forwarding=1"
 
         steps:
+            - name: Harden the runner
+              uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.19.1
+              with:
+                use-policy-store: true
+                egress-policy: audit
+                api-key: ${{ secrets.STEP_SECURITY_API_KEY }}
+
             - name: Dump GitHub context
               env:
                   GITHUB_CONTEXT: ${{ toJSON(github) }}
@@ -436,6 +464,13 @@ jobs:
         if: github.actor != 'restyled-io[bot]'  && inputs.run-codeql != true
 
         steps:
+            - name: Harden the runner
+              uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.19.1
+              with:
+                use-policy-store: true
+                egress-policy: audit
+                api-key: ${{ secrets.STEP_SECURITY_API_KEY }}
+
             - name: Checkout
               uses: actions/checkout@v6
               with:
@@ -537,6 +572,13 @@ jobs:
                 net.ipv4.conf.all.forwarding=0 net.ipv6.conf.all.forwarding=0"
 
         steps:
+            - name: Harden the runner
+              uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.19.1
+              with:
+                use-policy-store: true
+                egress-policy: audit
+                api-key: ${{ secrets.STEP_SECURITY_API_KEY }}
+
             - name: Checkout
               uses: actions/checkout@v6
             - name: Checkout submodules & Bootstrap
